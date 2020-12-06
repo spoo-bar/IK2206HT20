@@ -38,12 +38,15 @@ public class ForwardClient
     private static String sessionHost;
 
     /**
-     * Do handshake negotiation with server to authenticate and
-     * learn parameters: session port, host, key, and IV
+     * Do handshake negotiation with server to authenticate and learn parameters:
+     * session port, host, key, and IV
+     * 
+     * @throws Exception
      */
 
-    private static void doHandshake(Socket handshakeSocket) throws IOException {
+    private static void doHandshake(Socket handshakeSocket) throws Exception {
         clientHandshake = new ClientHandshake(handshakeSocket);
+        
     }
 
     /*
@@ -60,7 +63,7 @@ public class ForwardClient
      * Run handshake negotiation, then set up a listening socket 
      * and start port forwarder thread.
      */
-    static public void startForwardClient() throws IOException {
+    static public void startForwardClient() throws Exception {
 
         /*
          * First, run the handshake protocol to learn session parameters.
@@ -144,7 +147,7 @@ public class ForwardClient
         }
         try {
             startForwardClient();
-        } catch (IOException ex) {
+        } catch (Exception ex) {
             System.out.println(ex);
             System.exit(1);
         }

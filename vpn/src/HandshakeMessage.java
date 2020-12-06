@@ -1,3 +1,5 @@
+// apparently all done
+
 /*
  * Handshake message encoding/decoding and transmission
  * for IK2206 project.
