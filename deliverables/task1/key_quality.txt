@@ -1,0 +1,4 @@
+Key Quality is the propoerty of the encryption key which determines how unpredictable and unique the generated key is.
+Another factor which determines the quality of the keys is the key length. Higher keylengths means more possible keys. This reduces vulnerability to exhaustive search attacks. Additionally, AES is dependent on pseudo random function to generate the keys. Therefore, better PRF algorithms generate higher quality keys. Testing the randomness of the PRF algorithm, is a way to benchmark key quality.
+
+To test the randomness of the PRF, considering the input as a series of values between 0-9, we can keep a count of the number of times each individual value has occured. By plotting this on a distribution graph, we can check for the deviations. Higher quality PRF will have low deviations while lower quality PRF will have high deviations.
