@@ -1,4 +1,6 @@
 import java.security.NoSuchAlgorithmException;
+import java.util.Base64;
+
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
@@ -34,5 +36,9 @@ public class SessionKey {
         // takes a sequence of bytes and transforms into anothe rsequence of bytes
         // convert symmetric key to a sequence of bytes
         return secretKey.getEncoded();
+    }
+
+    public String encodeKey() {
+        return Base64.getEncoder().withoutPadding().encodeToString(secretKey.getEncoded());
     }
 }

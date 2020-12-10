@@ -5,7 +5,11 @@
  */
 
 import java.net.Socket;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.security.InvalidKeyException;
+import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
@@ -16,8 +20,13 @@ import java.security.cert.CertificateExpiredException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.CertificateNotYetValidException;
 import java.security.cert.X509Certificate;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.Base64;
+import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 
 public class ClientHandshake {
@@ -30,6 +39,10 @@ public class ClientHandshake {
     public String sessionHost = "localhost";
     public int sessionPort = 12345;
 
+
+    protected static SessionEncrypter sessionEncrypter;
+    protected static SessionDecrypter sessionDecrypter;
+
     private Socket handshakeSocket;
 
     /* Security parameters key/iv should also go here. Fill in! */
@@ -37,12 +50,6 @@ public class ClientHandshake {
     private X509Certificate clientCertificate;
     private X509Certificate caCertificate;
     private PrivateKey clientPrivateKey;
-
-    private byte[] sessionKey;
-    private byte[] sessionIv;
-
-    public SessionDecrypter sessionDecrypter;
-    public SessionEncrypter sessionEncrypter;
 
     /**
      * Run client handshake protocol on a handshake socket. Here, we do nothing, for
@@ -58,23 +65,30 @@ public class ClientHandshake {
             CertificateException, NoSuchAlgorithmException, InvalidKeyException, NoSuchProviderException,
             SignatureException, CertificateExpiredException, CertificateNotYetValidException {
 
+
+        this.clientCertificate = getCertificate(arguments.get("usercert"));
+        this.caCertificate = getCertificate(arguments.get("cacert"));
+        this.clientPrivateKey = getPrivateKeyFromFile(arguments.get("key"));
+
+
         HandshakeMessage clientHello = new HandshakeMessage();
         clientHello.putParameter("MessageType", "ClientHello");
-        clientHello.putParameter("Certificate", Base64.getEncoder().withoutPadding().encodeToString(clientCertificate.getEncoded()));
+        clientHello.putParameter("Certificate",
+                Base64.getEncoder().withoutPadding().encodeToString(clientCertificate.getEncoded()));
         clientHello.send(handshakeSocket);
 
         HandshakeMessage serverHello = new HandshakeMessage();
         serverHello.recv(handshakeSocket);
 
-        if(!serverHello.getParameter("MessageType").equals("ServerHello")) {
-            throw new Exception("Did not understand message"); 
+        if (!serverHello.getParameter("MessageType").equals("ServerHello")) {
+            throw new Exception("Did not understand message");
             // TODO - better message? check if they ask for something
         }
 
         X509Certificate serveCertificate = getCertificateFromByte64String(serverHello.getParameter("Certificate"));
         serveCertificate.verify(caCertificate.getPublicKey());
         serveCertificate.checkValidity();
-        
+
         HandshakeMessage forwardMessage = new HandshakeMessage();
         forwardMessage.putParameter("MessageType", "Forward"); // TODO - see if this is what the protocol is
         forwardMessage.putParameter("TargetHost", arguments.get("targethost"));
@@ -84,21 +98,22 @@ public class ClientHandshake {
         HandshakeMessage sessionMessage = new HandshakeMessage();
         sessionMessage.recv(handshakeSocket);
 
-        if(!sessionMessage.getParameter("MessageType").equals("Session")) {
+        if (!sessionMessage.getParameter("MessageType").equals("Session")) {
             throw new Exception("Received unexpected message"); // TODO
         }
 
         sessionHost = sessionMessage.getParameter("ServerHost");
         sessionPort = Integer.parseInt(sessionMessage.getParameter("ServerPort"));
 
-        sessionKey = Base64.getDecoder().decode(sessionMessage.getParameter("SessionKey"));
-        sessionIv = Base64.getDecoder().decode(sessionMessage.getParameter("SessionIV"));
+        var sessionKey = HandshakeCrypto.decrypt(Base64.getDecoder().decode(sessionMessage.getParameter("SessionKey")),
+                clientPrivateKey);
 
-        var sessionKeyString = HandshakeCrypto.decrypt(sessionKey, clientPrivateKey);
-        var ivString = HandshakeCrypto.decrypt(sessionIv, clientPrivateKey);
+                Logger.log(sessionMessage.getParameter("SessionIV"));
+        var sessionIv = HandshakeCrypto.decrypt(Base64.getDecoder().decode(sessionMessage.getParameter("SessionIV")),
+                clientPrivateKey);
 
-        sessionDecrypter = new SessionDecrypter(sessionKeyString, ivString);
-        sessionEncrypter = new SessionEncrypter(sessionKeyString, ivString);
+        sessionEncrypter = new SessionEncrypter(sessionKey, sessionIv);
+        sessionDecrypter = new SessionDecrypter(sessionKey, sessionIv);
 
         handshakeSocket.close();
 
@@ -113,5 +128,26 @@ public class ClientHandshake {
         certificate = (X509Certificate) cf.generateCertificate(new ByteArrayInputStream(decodedCertificateData));
 
         return certificate;
+    }
+
+    public PrivateKey getPrivateKeyFromFile(String keyFilePath)
+            throws IOException, NoSuchAlgorithmException, InvalidKeySpecException {
+        Path path = Paths.get(keyFilePath);
+        byte[] privKeyByteArray = Files.readAllBytes(path);
+
+        PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(privKeyByteArray);
+
+        KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+
+        PrivateKey privateKey = keyFactory.generatePrivate(keySpec);
+
+        return privateKey;
+    }
+
+    private static X509Certificate getCertificate(String filePath) throws CertificateException, FileNotFoundException {
+        FileInputStream fileInputStream = new FileInputStream(filePath);
+        BufferedInputStream bufferedInputStream = new BufferedInputStream(fileInputStream);
+        CertificateFactory factory = CertificateFactory.getInstance("X.509");
+        return (X509Certificate) factory.generateCertificate(bufferedInputStream);
     }
 }

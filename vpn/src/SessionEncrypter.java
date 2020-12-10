@@ -3,6 +3,7 @@ import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.util.Base64;
 
 import javax.crypto.Cipher;
 import javax.crypto.CipherOutputStream;
@@ -38,6 +39,10 @@ public class SessionEncrypter {
 
     public byte[] getIVBytes() {
         return ivParameterSpec.getIV();
+    }
+
+    public String encodeKey() {
+        return sessionKey.encodeKey();
     }
 
     public CipherOutputStream openCipherOutputStream(OutputStream output) {

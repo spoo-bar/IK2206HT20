@@ -46,7 +46,7 @@ public class ForwardClient
 
     private static void doHandshake(Socket handshakeSocket) throws Exception {
         clientHandshake = new ClientHandshake(handshakeSocket);
-        
+        clientHandshake.doHandshake(arguments);
     }
 
     /*
@@ -90,7 +90,8 @@ public class ForwardClient
          */
         ForwardServerClientThread forwardThread =
             new ForwardServerClientThread(proxySocket,
-                                          clientHandshake.sessionHost, clientHandshake.sessionPort);
+                                          clientHandshake.sessionHost, clientHandshake.sessionPort, ClientHandshake.sessionEncrypter,
+                        ClientHandshake.sessionDecrypter);
         /* 
          * Launch the fowarder 
          */
